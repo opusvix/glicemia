@@ -1,0 +1,129 @@
+GLICEMIA EM JEJUM - como colocar no celular
+
+O app é uma página que você instala no celular. Os dados ficam só no aparelho (a sincronização com o Google Drive, da Parte 4, é opcional).
+O código é publicado de graça no GitHub Pages. Nenhum dado seu vai para o GitHub.
+
+PARTE 1: PUBLICAR (uma vez, pelo computador)
+
+1. Descompacte este ZIP. Dentro há index.html, app.js, logic.js, painel.js, config.js, style.css, privacidade.html, termos.html,
+   sw.js, manifest.webmanifest e a pasta icons.
+2. Entre em github.com com a sua conta (opusvix) e clique em New repository.
+   Nome: glicemia. Marque Public (o GitHub Pages gratuito exige repositório público).
+   Isso é seguro: só o código fica público, os seus registros não passam por lá.
+3. Na página do repositório novo, clique em "uploading an existing file".
+   Arraste para lá todos os arquivos e a pasta icons, descompactados. Clique em Commit changes.
+4. Vá em Settings, depois Pages. Em Source escolha "Deploy from a branch".
+   Em Branch escolha main e a pasta / (root). Clique em Save.
+5. Espere 1 a 2 minutos e atualize a página. O endereço aparece no topo:
+   https://opusvix.github.io/glicemia/
+
+PARTE 2: INSTALAR NO CELULAR
+
+Abra o endereço acima no navegador do celular.
+- Android (Chrome): menu de três pontos, "Instalar app" ou "Adicionar à tela inicial".
+- iPhone (Safari): botão Compartilhar, "Adicionar à Tela de Início".
+A partir daí abra sempre pelo ícone da tela inicial.
+
+ATENÇÃO (iPhone): o app instalado e o Safari guardam dados separados. Instale primeiro
+e só depois importe a planilha, dentro do app instalado.
+
+PARTE 3: TRAZER O HISTÓRICO DA PLANILHA
+
+1. Na planilha, no computador: Arquivo, Salvar como, CSV. Mande o arquivo para o celular
+   (WhatsApp, e-mail para você mesmo ou Drive). Se a planilha tiver várias abas, o CSV traz só a aba
+   que estava aberta: deixe aberta a aba "Glicemia".
+2. No app: aba Dados, "Escolher arquivo CSV", depois "Ler dados".
+   O app acha sozinho a coluna da data e a coluna "jejum" (as outras medições, pré-almoço e pré-janta,
+   ficam de fora). Se houver as colunas horaJejum e observacoes, ele também traz a hora da coleta e a
+   observação de cada dia. Já vem com início em 04/06/2025. Dias em branco e datas anteriores ficam de fora.
+   Ele reconhece se as datas estão em dia/mês/ano ou mês/dia/ano (6/4/2025 pode ser 6 de abril ou
+   4 de junho) e avisa no resumo quando lê como mês/dia/ano. Confira o primeiro e o último dia no
+   resumo e toque em Importar.
+   (Outra opção: copie as linhas da planilha aberta no celular e cole na caixa de texto.)
+
+PARTE 4 (OPCIONAL): USAR NO COMPUTADOR E SINCRONIZAR COM O CELULAR
+
+No computador, abra o mesmo endereço (https://opusvix.github.io/glicemia/) no Chrome. Se quiser,
+clique no ícone de instalar na barra de endereços para ter o app como programa.
+Sem a sincronização, cada aparelho guarda os seus próprios registros. Para deixá-los iguais:
+
+A sincronização usa uma pasta privada e oculta do SEU Google Drive (só este app lê o arquivo,
+que se chama glicemia.json). Nada passa por servidor de terceiros. O Google precisa ser configurado
+uma única vez, de graça, pelo computador. Os nomes dos menus do Google mudam de vez em quando.
+
+1. Entre em console.cloud.google.com com a mesma conta Google que você usa no celular.
+   Crie um projeto novo (nome: glicemia).
+2. Menu "APIs e serviços", "Biblioteca". Procure "Google Drive API" e clique em Ativar.
+3. Em "Tela de permissão OAuth" (ou "Google Auth Platform"): tipo de usuário "Externo", nome do
+   app "Glicemia", seu e-mail como e-mail de suporte e de contato. Em "Escopos" (ou "Acesso a dados")
+   adicione somente o escopo  .../auth/drive.appdata  (View and manage its own configuration data in your
+   Google Drive). Depois escolha UM dos caminhos:
+
+   CAMINHO A (mais simples, para uso pessoal): deixe o app em modo "Teste". Em "Público-alvo",
+   "Usuários de teste", adicione o seu e-mail Google (e o de quem mais for usar). Não precisa de links
+   nem de política de privacidade, e não precisa clicar em "Publicar app". No primeiro login o Google
+   avisa que o app está em teste: toque em Continuar. Nesse modo o Google vence a permissão a cada
+   7 dias; quando isso acontecer, o app mostra "Toque aqui para entrar..." na aba Hoje e basta tocar.
+
+   CAMINHO B (publicar o app): o Google exige 3 links. Antes, publique no GitHub os arquivos novos
+   (privacidade.html e termos.html) e confira se abrem. Em "Branding" (Identidade visual), preencha:
+     Página inicial ............. https://opusvix.github.io/glicemia/
+     Política de privacidade .... https://opusvix.github.io/glicemia/privacidade.html
+     Termos de serviço .......... https://opusvix.github.io/glicemia/termos.html
+     Domínios autorizados ....... opusvix.github.io
+   Depois, em "Público-alvo", clique em "Publicar app". Como o escopo não é sensível, o app não
+   precisa de verificação do Google. Se o Google recusar o domínio github.io (ele é um domínio
+   público compartilhado), use o Caminho A.
+
+4. Em "Credenciais", "Criar credenciais", "ID do cliente OAuth", tipo "Aplicativo da Web".
+   Em "Origens JavaScript autorizadas" adicione:  https://opusvix.github.io
+   (sem barra no final e sem /glicemia). Não precisa de URI de redirecionamento.
+5. Copie o "ID do cliente" (termina com .apps.googleusercontent.com). Abra o arquivo config.js,
+   cole o ID entre as aspas de clienteId e salve. O ID não é uma senha; pode ficar no repositório público.
+6. Suba o config.js no repositório do GitHub (substituindo o antigo) e aumente a VERSAO no sw.js.
+   Espere 1 a 2 minutos e abra o app duas vezes para ele atualizar.
+7. No celular e no computador: aba Dados, "Sincronizar celular e computador", "Ligar sincronização".
+   Escolha a conta Google e permita. Os históricos dos dois aparelhos são somados.
+
+Como funciona:
+- Cada anotação, alteração ou exclusão sobe sozinha em poucos segundos. Ao voltar para o app, ele busca
+  o que foi anotado no outro aparelho. O botão "Sincronizar agora" força a troca.
+- Sem internet, o app continua funcionando e sincroniza depois.
+- Se o mesmo dia for alterado nos dois aparelhos, vale a alteração mais recente (confira se o relógio
+  de ambos está certo). Um dia excluído em um aparelho some do outro; anotar de novo depois traz o dia de volta.
+- "Apagar todos os dados" e "Restaurar backup" valem para todos os aparelhos quando a sincronização está ligada.
+- A permissão dura cerca de 1 hora por vez. Se o Google pedir login de novo, aparece o aviso
+  "Toque aqui para entrar..." na aba Hoje; basta tocar.
+- O backup da aba Dados continua recomendado.
+
+USO DIÁRIO
+
+- Deixe o lembrete na agenda do Google e coloque o endereço do app na descrição do evento.
+  Um toque no endereço abre o app para anotar.
+- Aba Hoje: digite a glicemia e toque em Salvar. Dá para trocar o dia para anotar um esquecido.
+  Em "Hora e observação (opcional)" você pode guardar a hora da coleta e uma anotação do dia
+  (ex.: início de um remédio). Os dois são opcionais.
+- Aba Relatório: média geral, média móvel (7, 14 ou 30 dias), gráfico e a tabela do detalhamento diário.
+- Aba Painel: quatro páginas com filtros por ano, mês e dia da semana.
+  . Visão Geral: média, maior e menor valor, % de dias na faixa normal e o gráfico do jejum com média móvel.
+  . Por mês: média, máximo, mínimo e distribuição de faixas de cada mês.
+  . Rotina e Comportamento: média por dia da semana, comparação fim de semana x dias úteis e,
+    se você registrar a hora da coleta, a dispersão hora x glicemia.
+  . Detalhamento Diário: a tabela completa, com filtro para ver só os dias de atenção ou de alta.
+  Dia sem medição fica de fora das contas; o app nunca conta um dia vazio como zero.
+
+BACKUP
+
+Aba Dados, "Exportar backup". Salve o arquivo no Drive ou em outro lugar fora do celular.
+O app avisa na aba Hoje quando passar de 30 dias sem backup. Para voltar: "Restaurar backup".
+
+FAIXAS DE COR
+
+A tabela usa as faixas definidas por você, em mg/dL: normal abaixo de 125, atenção de 125
+a 179, alta a partir de 180. Para mudar os limites, use a aba Dados. Não substitui
+orientação médica.
+
+ATUALIZAR O APP NO FUTURO
+
+Troque os arquivos no repositório e, no arquivo sw.js, aumente o número em
+const VERSAO = 'glicemia-v6' (vire v7, v8...), para o celular baixar a versão nova.

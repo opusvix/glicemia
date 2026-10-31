@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f9f9f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0d0d" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Glicemia">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+<title>Glicemia</title>
+</head>
+<body>
+
+<main id="app">
+
+  <!-- ===== HOJE ===== -->
+  <section id="tela-hoje" class="tela" aria-labelledby="t-hoje">
+    <header class="cab">
+      <p class="cab-data" id="hoje-extenso"></p>
+      <h1 id="t-hoje">Glicemia em jejum</h1>
+    </header>
+
+    <form id="form-registro" novalidate autocomplete="off">
+      <div class="linha-dia">
+        <label for="in-data">Dia do registro</label>
+        <input type="date" id="in-data" required>
+      </div>
+
+      <div class="entrada">
+        <label for="in-valor" class="so-leitor">Glicemia em jejum, em miligramas por decilitro</label>
+        <input id="in-valor" type="text" inputmode="decimal" maxlength="6" placeholder="—" aria-describedby="msg-registro">
+        <span class="unidade" aria-hidden="true">mg/dL</span>
+      </div>
+
+      <p id="msg-registro" class="msg-registro" role="status" aria-live="polite"></p>
+
+      <details class="extra-dia" id="extra-dia">
+        <summary>Hora e observação (opcional)</summary>
+        <div class="campos-linha">
+          <label for="in-hora">Hora da coleta <input type="time" id="in-hora"></label>
+        </div>
+        <label for="in-obs" class="so-leitor">Observação do dia</label>
+        <textarea id="in-obs" rows="2" maxlength="200" placeholder="Observação do dia (ex.: comecei um remédio)"></textarea>
+      </details>
+
+      <div class="acoes">
+        <button type="submit" class="botao botao-primario" id="btn-salvar">Salvar</button>
+        <button type="button" class="botao botao-texto" id="btn-excluir" hidden>Excluir este dia</button>
+      </div>
+    </form>
+
+    <div id="aviso-backup" class="nota-aviso" hidden>
+      <p id="aviso-backup-texto"></p>
+      <button type="button" class="botao botao-sec" id="btn-ir-backup">Fazer backup agora</button>
+    </div>
+
+    <button type="button" class="botao botao-texto" id="sinc-hoje" hidden></button>
+
+    <h2 class="sub-titulo">Últimos registros</h2>
+    <ol id="lista-recentes" class="recentes"></ol>
+  </section>
+
+  <!-- ===== RELATÓRIO ===== -->
+  <section id="tela-relatorio" class="tela" aria-labelledby="t-rel" hidden>
+    <header class="cab">
+      <p class="cab-data" id="rel-subtitulo"></p>
+      <h1 id="t-rel">Relatório</h1>
+    </header>
+
+    <div class="kpis">
+      <div class="kpi">
+        <span class="kpi-rotulo">Média geral</span>
+        <span class="kpi-valor"><span id="kpi-media">—</span><small>mg/dL</small></span>
+        <span class="kpi-nota" id="kpi-media-nota"></span>
+      </div>
+      <div class="kpi">
+        <span class="kpi-rotulo">Média móvel</span>
+        <span class="kpi-valor"><span id="kpi-mm">—</span><small>mg/dL</small></span>
+        <span class="kpi-nota">
+          <label for="sel-janela" class="so-leitor">Janela da média móvel, em dias</label>
+          <select id="sel-janela">
+            <option value="7">7 dias</option>
+            <option value="14">14 dias</option>
+            <option value="30">30 dias</option>
+          </select>
+          <span id="kpi-mm-nota"></span>
+        </span>
+      </div>
+    </div>
+
+    <div class="chips" role="group" aria-label="Período mostrado no gráfico e na tabela">
+      <button type="button" class="chip" data-dias="30" aria-pressed="false">30 dias</button>
+      <button type="button" class="chip" data-dias="90" aria-pressed="true">90 dias</button>
+      <button type="button" class="chip" data-dias="0" aria-pressed="false">Tudo</button>
+    </div>
+
+    <figure class="grafico-fig">
+      <div class="legenda" id="legenda"></div>
+      <div class="grafico" id="grafico"></div>
+      <figcaption id="grafico-legenda" class="so-leitor"></figcaption>
+    </figure>
+
+    <h2 class="sub-titulo">Detalhamento diário</h2>
+    <div id="tabela-area"></div>
+    <p class="rodape-faixas" id="rodape-faixas"></p>
+  </section>
+
+  <!-- ===== PAINEL ===== -->
+  <section id="tela-painel" class="tela tela-larga" aria-labelledby="t-painel" hidden>
+    <div id="painel-raiz"></div>
+  </section>
+
+  <!-- ===== DADOS ===== -->
+  <section id="tela-dados" class="tela" aria-labelledby="t-dados" hidden>
+    <header class="cab">
+      <p class="cab-data">Guardados só neste aparelho</p>
+      <h1 id="t-dados">Dados</h1>
+    </header>
+
+    <section class="bloco" aria-labelledby="h-importar">
+      <h2 id="h-importar" class="sub-titulo">Importar da planilha</h2>
+      <p class="dica">Na planilha, use Arquivo, Salvar como, CSV. Escolha o arquivo aqui, ou copie as linhas da planilha e cole na caixa.</p>
+      <div class="campo-arquivo">
+        <button type="button" class="botao botao-sec" id="btn-arq-csv">Escolher arquivo CSV</button>
+        <input type="file" id="arq-csv" accept=".csv,.txt,text/csv,text/plain" hidden>
+      </div>
+      <label for="txt-colar" class="so-leitor">Linhas copiadas da planilha</label>
+      <textarea id="txt-colar" rows="4" placeholder="Ou cole aqui as linhas copiadas da planilha"></textarea>
+      <button type="button" class="botao botao-sec" id="btn-ler">Ler dados</button>
+
+      <div id="imp-previa" hidden>
+        <div class="campos-linha">
+          <label>Coluna da data <select id="sel-col-data"></select></label>
+          <label>Coluna da glicemia <select id="sel-col-valor"></select></label>
+          <label>Importar a partir de <input type="date" id="in-inicio"></label>
+        </div>
+        <div class="previa-rolagem" id="previa-tabela"></div>
+        <p class="dica" id="imp-resumo" role="status" aria-live="polite"></p>
+        <button type="button" class="botao botao-primario" id="btn-importar">Importar</button>
+      </div>
+    </section>
+
+    <section class="bloco" aria-labelledby="h-sinc">
+      <h2 id="h-sinc" class="sub-titulo">Sincronizar celular e computador</h2>
+      <p class="dica" id="sinc-texto"></p>
+      <div class="acoes-grade">
+        <button type="button" class="botao botao-primario" id="btn-sinc-ligar" hidden>Ligar sincronização</button>
+        <button type="button" class="botao botao-sec" id="btn-sinc-agora" hidden>Sincronizar agora</button>
+        <button type="button" class="botao botao-texto" id="btn-sinc-desligar" hidden>Desligar</button>
+      </div>
+      <p class="dica" id="sinc-status" role="status" aria-live="polite"></p>
+      <p class="dica">Ao ligar, o app pede ao Google acesso só à pasta privada dele no seu Drive. Veja a <a href="privacidade.html">Política de Privacidade</a>.</p>
+    </section>
+
+    <section class="bloco" aria-labelledby="h-backup">
+      <h2 id="h-backup" class="sub-titulo">Backup</h2>
+      <p class="dica">Se o celular for perdido, trocado ou formatado, os dados vão junto. O backup é um arquivo que você guarda fora do aparelho.</p>
+      <div class="acoes-grade">
+        <button type="button" class="botao botao-primario" id="btn-backup">Exportar backup</button>
+        <button type="button" class="botao botao-sec" id="btn-restaurar">Restaurar backup</button>
+        <button type="button" class="botao botao-sec" id="btn-csv">Exportar CSV</button>
+      </div>
+      <input type="file" id="arq-backup" accept=".json,application/json" hidden>
+      <p class="dica" id="txt-ultimo-backup"></p>
+    </section>
+
+    <section class="bloco" aria-labelledby="h-faixas">
+      <h2 id="h-faixas" class="sub-titulo">Faixas de cor da tabela</h2>
+      <p class="dica">Faixas usadas para colorir a tabela. Normal abaixo do limite de atenção; ajuste aqui se seu médico indicar outras.</p>
+      <div class="campos-linha">
+        <label>Atenção, a partir de <input type="text" inputmode="numeric" id="fx-atencao" maxlength="3"></label>
+        <label>Alta, a partir de <input type="text" inputmode="numeric" id="fx-alta" maxlength="3"></label>
+      </div>
+      <div class="acoes-grade">
+        <button type="button" class="botao botao-sec" id="btn-salvar-faixas">Salvar faixas</button>
+        <button type="button" class="botao botao-texto" id="btn-faixas-padrao">Voltar ao padrão</button>
+      </div>
+      <p class="dica" id="msg-faixas" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="bloco" aria-labelledby="h-apagar">
+      <h2 id="h-apagar" class="sub-titulo">Apagar tudo</h2>
+      <p class="dica">Remove todos os registros deste aparelho. Faça o backup antes.</p>
+      <button type="button" class="botao botao-perigo" id="btn-apagar">Apagar todos os dados</button>
+    </section>
+  </section>
+
+  <footer class="rodape-legal">
+    <p>Glicemia em jejum: registro diário da glicemia em jejum, com relatório e gráfico. Os dados ficam só no seu aparelho; a sincronização com o Google Drive é opcional.</p>
+    <p><a href="privacidade.html">Política de Privacidade</a> · <a href="termos.html">Termos de Serviço</a></p>
+  </footer>
+
+</main>
+
+<nav class="abas" aria-label="Seções do app">
+  <button type="button" class="aba" data-tela="hoje" aria-current="page">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c3.3 4 5.5 6.9 5.5 9.9a5.5 5.5 0 0 1-11 0c0-3 2.2-5.900 5.500-9.900z"/></svg>
+    <span>Hoje</span>
+  </button>
+  <button type="button" class="aba" data-tela="relatorio">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-6"/></svg>
+    <span>Relatório</span>
+  </button>
+  <button type="button" class="aba" data-tela="painel">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6v8H4zM14 3h6v18h-6zM4 3h6v6H4z"/></svg>
+    <span>Painel</span>
+  </button>
+  <button type="button" class="aba" data-tela="dados">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6c0-1.700 3.100-3 7-3s7 1.300 7 3-3.100 3-7 3-7-1.300-7-3zM5 6v6c0 1.700 3.100 3 7 3s7-1.300 7-3V6M5 12v6c0 1.700 3.100 3 7 3s7-1.300 7-3v-6"/></svg>
+    <span>Dados</span>
+  </button>
+</nav>
+
+<div id="aviso" class="aviso" role="status" aria-live="polite"></div>
+
+<script src="config.js"></script>
+<script src="logic.js"></script>
+<script src="painel.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
