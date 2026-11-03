@@ -1,7 +1,7 @@
 /* Service worker: deixa o app abrir sem internet. Troque VERSAO ao publicar mudanças. */
-const VERSAO = 'glicemia-v6';
+const VERSAO = 'glicemia-v7';
 const ARQUIVOS = [
-  './', 'index.html', 'privacidade.html', 'termos.html', 'style.css', 'config.js', 'logic.js', 'painel.js', 'app.js', 'manifest.webmanifest',
+  './', 'index.html', 'privacidade.html', 'termos.html', 'style.css', 'config.js', 'vendor/supabase.js', 'logic.js', 'painel.js', 'app.js', 'manifest.webmanifest',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'
 ];
 

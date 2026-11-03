@@ -589,7 +589,7 @@
   function apagarTudo() {
     if (!estado.registros.length) { avisar('Não há dados para apagar.'); return; }
     if (!window.confirm('Apagar os ' + estado.registros.length + ' registros deste aparelho? Isso não pode ser desfeito.' +
-      (estado.sinc.ativa ? ' Com a sincronização ligada, eles também serão apagados do Google Drive e dos outros aparelhos.' : ''))) return;
+      (estado.sinc.ativa ? ' Com a sincronização ligada, eles também serão apagados da nuvem e dos outros aparelhos.' : ''))) return;
     const agora = Date.now();
     const gravou = alterar(() => {
       estado.apagados = estado.apagados.filter((a) => !registroDoDia(a.data)).concat(estado.registros.map((r) => ({ data: r.data, ts: agora })));
@@ -602,23 +602,27 @@
     desenharDados();
   }
 
-  /* ---------- sincronização (Google Drive, pasta privada do app) ---------- */
-  /* Escopo drive.appdata: o app só enxerga o arquivo que ele mesmo criou, numa pasta oculta da sua conta.
-     O token de acesso fica só na memória. O script do Google só é carregado quando a sincronização está configurada. */
+  /* ---------- sincronização (Supabase; login que se mantém sozinho) ---------- */
+  /* A biblioteca do Supabase (vendor/supabase.js) só é carregada quando a sincronização está configurada.
+     A sessão fica guardada e é renovada pelo próprio Supabase — não precisa entrar de novo a cada hora. */
 
-  const ESCOPO_DRIVE = 'https://www.googleapis.com/auth/drive.appdata';
-  const ARQUIVO_NUVEM = 'glicemia.json';
-  const clienteId = () => String((window.GLIC_CONFIG && window.GLIC_CONFIG.clienteId) || '').trim();
+  const TABELA = 'glicemia';
 
-  let gisPromessa = null;
-  let clienteToken = null;
-  let resolverToken = () => {};
-  let token = null;
-  let tokenValidoAte = 0;
+  function cfgSup() {
+    const c = window.GLIC_CONFIG || {};
+    const url = String(c.supabaseUrl || '').trim();
+    const chave = String(c.supabaseAnonKey || '').trim();
+    return url && chave ? { url: url, chave: chave } : null;
+  }
+
+  let supPromessa = null;
+  let sb = null;               // cliente Supabase
+  let sessao = null;           // sessão atual (ou null)
   let sincEmCurso = null;
   let sincPendente = false;
   let sincMsg = '';
   let temporizadorSinc = null;
+  let timerPeriodico = null;
 
   function quando(iso) {
     const d = new Date(iso);
@@ -627,119 +631,112 @@
     return G.dataBR(G.hojeISO(d)) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
   }
 
-  function carregarGIS() {
-    if (window.google && window.google.accounts && window.google.accounts.oauth2) return Promise.resolve();
-    if (!gisPromessa) {
-      gisPromessa = new Promise((ok, falha) => {
-        const s = document.createElement('script');
-        s.src = 'https://accounts.google.com/gsi/client';
-        s.async = true;
-        s.onload = () => ok();
-        s.onerror = () => { gisPromessa = null; falha(new Error('sem-rede')); };
-        document.head.appendChild(s);
+  /* Carrega a biblioteca uma vez e cria o cliente, que já lê a sessão guardada no aparelho. */
+  function obterCliente() {
+    if (sb) return Promise.resolve(sb);
+    const cfg = cfgSup();
+    if (!cfg) return Promise.reject(new Error('sem-config'));
+    if (!supPromessa) {
+      supPromessa = new Promise((ok, falha) => {
+        if (window.supabase && window.supabase.createClient) return ok();
+        const el = document.createElement('script');
+        el.src = 'vendor/supabase.js';
+        el.async = true;
+        el.onload = () => ok();
+        el.onerror = () => { supPromessa = null; falha(new Error('sem-rede')); };
+        document.head.appendChild(el);
       });
     }
-    return gisPromessa;
-  }
-
-  /* interativo = true abre a janela de login do Google; false só renova em silêncio (sem janela). */
-  function obterToken(interativo) {
-    if (token && Date.now() < tokenValidoAte - 60000) return Promise.resolve(token);
-    return carregarGIS().then(() => new Promise((ok, falha) => {
-      if (!clienteToken) {
-        clienteToken = window.google.accounts.oauth2.initTokenClient({
-          client_id: clienteId(),
-          scope: ESCOPO_DRIVE,
-          callback: (r) => resolverToken(r),
-          error_callback: (e) => resolverToken({ error: (e && e.type) || 'erro' }),
+    return supPromessa.then(() => {
+      if (!sb) {
+        sb = window.supabase.createClient(cfg.url, cfg.chave, {
+          auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'glicemia-sb-auth' },
         });
+        sb.auth.onAuthStateChange((_ev, s) => { sessao = s; });
       }
-      resolverToken = (r) => {
-        if (r && r.access_token) { token = r.access_token; tokenValidoAte = Date.now() + (r.expires_in || 3600) * 1000; ok(token); } else falha(new Error((r && r.error) || 'negado'));
-      };
-      clienteToken.requestAccessToken({ prompt: interativo ? '' : 'none' });
-    }));
-  }
-
-  function chamarDrive(url, init) {
-    init = init || {};
-    init.headers = Object.assign({ Authorization: 'Bearer ' + token }, init.headers || {});
-    return fetch(url, init).then((r) => {
-      if (r.ok) return r;
-      if (r.status === 401) token = null;
-      const e = new Error('Drive ' + r.status);
-      e.codigo = r.status;
-      throw e;
+      return sb;
     });
   }
 
-  function enviarParaNuvem(id, corpo) {
-    if (id) {
-      return chamarDrive('https://www.googleapis.com/upload/drive/v3/files/' + id + '?uploadType=media', {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: corpo,
-      });
-    }
-    const limite = 'glic' + Date.now().toString(36);
-    const meta = JSON.stringify({ name: ARQUIVO_NUVEM, parents: ['appDataFolder'] });
-    const partes = '--' + limite + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + meta +
-      '\r\n--' + limite + '\r\nContent-Type: application/json\r\n\r\n' + corpo + '\r\n--' + limite + '--';
-    return chamarDrive('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-      method: 'POST', headers: { 'Content-Type': 'multipart/related; boundary=' + limite }, body: partes,
+  function sessaoAtual() {
+    return obterCliente().then((c) => c.auth.getSession()).then((r) => { sessao = r.data ? r.data.session : null; return sessao; });
+  }
+
+  const logado = () => !!sessao;
+
+  function traduzErroAuth(e) {
+    const m = ((e && e.message) || '').toLowerCase();
+    if (m.indexOf('invalid login') > -1) return 'E-mail ou senha incorretos.';
+    if (m.indexOf('already registered') > -1 || m.indexOf('already been registered') > -1) return 'Já existe conta com esse e-mail. Toque em Entrar.';
+    if (m.indexOf('at least 6') > -1 || m.indexOf('password should be') > -1) return 'A senha precisa ter ao menos 6 caracteres.';
+    if (m.indexOf('not confirmed') > -1 || m.indexOf('email not confirmed') > -1) return 'Confirme o e-mail antes de entrar (ou desligue a confirmação no Supabase).';
+    if (m.indexOf('invalid email') > -1) return 'E-mail inválido.';
+    return (e && e.message) || 'Não consegui entrar.';
+  }
+
+  /* A pessoa digita a senha; o app só repassa ao Supabase e nunca a guarda. */
+  function entrar(email, senha, criar) {
+    return obterCliente().then((c) => (criar
+      ? c.auth.signUp({ email: email, password: senha })
+      : c.auth.signInWithPassword({ email: email, password: senha })
+    )).then((resp) => {
+      if (resp.error) { const e = new Error(resp.error.message || 'auth'); e.auth = true; throw e; }
+      sessao = resp.data ? resp.data.session : null;   // null no signUp quando o Supabase exige confirmar o e-mail
+      return sessao;
     });
   }
 
   const vistaDoEstado = () => ({ registros: estado.registros, apagados: estado.apagados, notas: estado.notas, faixas: estado.faixas, faixasTs: estado.faixasTs });
 
-  async function executarSinc(interativo, repetiu) {
-    try {
-      await obterToken(interativo);
-      const q = encodeURIComponent("name='" + ARQUIVO_NUVEM + "'");
-      const lista = await (await chamarDrive('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&orderBy=createdTime&pageSize=10&fields=files(id)&q=' + q)).json();
-      const id = lista.files && lista.files[0] && lista.files[0].id;
-      let remoto = G.normalizarEstado({});
-      if (id) {
-        const texto = await (await chamarDrive('https://www.googleapis.com/drive/v3/files/' + id + '?alt=media')).text();
-        remoto = G.lerBackup(texto);          // arquivo ilegível: lança erro e nada é alterado
-      }
-      const fundido = G.fundir(vistaDoEstado(), remoto, Date.now());
-      if (!id || G.assinatura(fundido) !== G.assinatura(remoto)) await enviarParaNuvem(id, G.gerarBackup(fundido));
-      // o usuário pode ter mexido durante a conversa com o Drive: funde de novo com o que está na tela agora
-      const novo = G.fundir(vistaDoEstado(), fundido, Date.now());
-      if (G.assinatura(novo) !== G.assinatura(vistaDoEstado())) {
-        estado.registros = novo.registros;
-        estado.apagados = novo.apagados;
-        estado.notas = novo.notas;
-        estado.faixas = novo.faixas;
-        estado.faixasTs = novo.faixasTs;
-        sincPendente = G.assinatura(novo) !== G.assinatura(fundido) || sincPendente;
-      }
-      estado.sinc.ultima = new Date().toISOString();
-      salvar();
-      if (!$('#tela-hoje').hidden) desenharHoje(true);
-      else if (!$('#tela-relatorio').hidden) desenharRelatorio();
-      else if (!$('#tela-painel').hidden) desenharPainel();
-    } catch (e) {
-      if (e && e.codigo === 401 && !repetiu) return executarSinc(interativo, true);
-      throw e;
+  function aplicarEstado(novo) {
+    estado.registros = novo.registros;
+    estado.apagados = novo.apagados;
+    estado.notas = novo.notas;
+    estado.faixas = novo.faixas;
+    estado.faixasTs = novo.faixasTs;
+  }
+
+  async function executarSinc() {
+    const s = await sessaoAtual();
+    if (!s) { const e = new Error('precisa-login'); e.login = true; throw e; }
+    const uid = s.user.id;
+    const sel = await sb.from(TABELA).select('dados').eq('user_id', uid).maybeSingle();
+    if (sel.error) { const e = new Error(sel.error.message); e.codigo = sel.error.code || 'erro'; throw e; }
+    const remoto = G.normalizarEstado(sel.data ? sel.data.dados : {});
+    const fundido = G.fundir(vistaDoEstado(), remoto, Date.now());
+    if (!sel.data || G.assinatura(fundido) !== G.assinatura(remoto)) {
+      const up = await sb.from(TABELA).upsert({ user_id: uid, dados: fundido, atualizado_em: new Date().toISOString() }, { onConflict: 'user_id' });
+      if (up.error) { const e = new Error(up.error.message); e.codigo = up.error.code || 'erro'; throw e; }
     }
+    // a pessoa pode ter mexido durante a conversa com o servidor: funde de novo com o que está na tela agora
+    const novo = G.fundir(vistaDoEstado(), fundido, Date.now());
+    if (G.assinatura(novo) !== G.assinatura(vistaDoEstado())) {
+      aplicarEstado(novo);
+      sincPendente = G.assinatura(novo) !== G.assinatura(fundido) || sincPendente;
+    }
+    estado.sinc.ultima = new Date().toISOString();
+    salvar();
+    if (!$('#tela-hoje').hidden) desenharHoje(true);
+    else if (!$('#tela-relatorio').hidden) desenharRelatorio();
+    else if (!$('#tela-painel').hidden) desenharPainel();
   }
 
-  function mensagemErroSinc(e, interativo) {
-    const c = e && e.codigo;
+  function mensagemErroSinc(e) {
     const m = (e && e.message) || '';
-    if (/backup/.test(m)) return 'O arquivo no Google Drive está ilegível. Não alterei nada, nem aqui nem lá.';
+    if (e && e.login) return 'Entre com seu e-mail e senha para sincronizar.';
     if (e instanceof TypeError || m === 'sem-rede') return 'Sem conexão. Tente de novo mais tarde.';
-    if (c) return 'O Google Drive recusou o pedido (código ' + c + '). Veja a Parte 4 do LEIA-ME.';
-    return interativo ? 'Não consegui entrar na conta Google.' : 'Toque aqui para entrar na conta Google e sincronizar.';
+    if (e && e.auth) return traduzErroAuth(e);
+    if (e && e.codigo) return 'O servidor recusou o pedido (' + e.codigo + '). Veja a Parte 4 do LEIA-ME.';
+    return 'Não consegui sincronizar agora.';
   }
 
-  function sincronizar(interativo) {
-    if (!clienteId()) return Promise.resolve(false);
+  function sincronizar() {
+    if (!cfgSup()) return Promise.resolve(false);
     if (sincEmCurso) { sincPendente = true; return sincEmCurso; }
     sincMsg = 'Sincronizando…';
     mostrarSinc();
-    sincEmCurso = executarSinc(interativo, false)
-      .then(() => { sincMsg = ''; return true; }, (e) => { sincMsg = mensagemErroSinc(e, interativo); return false; })
+    sincEmCurso = executarSinc()
+      .then(() => { sincMsg = ''; return true; }, (e) => { sincMsg = mensagemErroSinc(e); return false; })
       .then((deu) => {
         sincEmCurso = null;
         mostrarSinc();
@@ -750,35 +747,45 @@
   }
 
   function agendarSinc() {
-    if (!estado.sinc.ativa || !clienteId()) return;
+    if (!estado.sinc.ativa || !cfgSup()) return;
     clearTimeout(temporizadorSinc);
-    temporizadorSinc = setTimeout(() => sincronizar(false), 1500);
+    temporizadorSinc = setTimeout(() => { if (logado()) sincronizar(); }, 1200);
+  }
+
+  function iniciarTimerPeriodico() {
+    clearInterval(timerPeriodico);
+    timerPeriodico = setInterval(() => {
+      if (estado.sinc.ativa && cfgSup() && document.visibilityState === 'visible' && logado() && !sincEmCurso) sincronizar();
+    }, 45000);
   }
 
   function desenharSincHoje() {
     const b = $('#sinc-hoje');
-    if (!estado.sinc.ativa || !clienteId()) { b.hidden = true; return; }
+    if (!estado.sinc.ativa || !cfgSup()) { b.hidden = true; return; }
     b.hidden = false;
-    b.textContent = sincMsg || (estado.sinc.ultima ? 'Sincronizado em ' + quando(estado.sinc.ultima) + ' · tocar para sincronizar' : 'Tocar para sincronizar');
+    if (!logado()) { b.textContent = sincMsg || 'Toque para entrar e sincronizar'; return; }
+    b.textContent = sincMsg || (estado.sinc.ultima ? 'Sincronizado em ' + quando(estado.sinc.ultima) : 'Tocar para sincronizar');
   }
 
   function desenharSinc() {
-    const ligar = $('#btn-sinc-ligar'), agora = $('#btn-sinc-agora'), desl = $('#btn-sinc-desligar');
-    if (!clienteId()) {
+    const cfg = cfgSup();
+    const form = $('#sinc-login'), agora = $('#btn-sinc-agora'), sair = $('#btn-sinc-sair'), aviso = $('#sinc-aviso-privacidade');
+    if (!cfg) {
       $('#sinc-texto').textContent = 'Ainda não configurada. O passo a passo está na Parte 4 do arquivo LEIA-ME.';
-      ligar.hidden = agora.hidden = desl.hidden = true;
+      form.hidden = true; agora.hidden = true; sair.hidden = true; aviso.hidden = true;
       $('#sinc-status').textContent = '';
       return;
     }
-    const ativa = estado.sinc.ativa;
-    $('#sinc-texto').textContent = ativa
-      ? 'Ligada. Os registros ficam iguais neste aparelho e nos outros que usam a mesma conta Google.'
-      : 'Mantém os registros iguais no celular e no computador, num arquivo privado da sua conta Google Drive. Só este app lê esse arquivo.';
-    ligar.hidden = ativa;
-    agora.hidden = !ativa;
-    desl.hidden = !ativa;
-    $('#sinc-status').textContent = sincMsg || (estado.sinc.ultima ? 'Última sincronização: ' + quando(estado.sinc.ultima) + '.' : '');
-    if (!ativa) carregarGIS().catch(() => {});   // já carregado quando o toque no botão abrir a janela do Google
+    aviso.hidden = false;
+    if (logado()) {
+      const email = sessao && sessao.user ? sessao.user.email : '';
+      $('#sinc-texto').textContent = 'Conectado' + (email ? ' como ' + email : '') + '. Os registros ficam iguais em todos os aparelhos onde você entra com essa conta.';
+      form.hidden = true; agora.hidden = false; sair.hidden = false;
+    } else {
+      $('#sinc-texto').textContent = 'Entre com um e-mail e uma senha (a mesma conta nos dois aparelhos) para manter os registros iguais no celular e no computador.';
+      form.hidden = false; agora.hidden = true; sair.hidden = true;
+    }
+    $('#sinc-status').textContent = sincMsg || (logado() && estado.sinc.ultima ? 'Última sincronização: ' + quando(estado.sinc.ultima) + '.' : '');
   }
 
   function mostrarSinc() {
@@ -786,21 +793,32 @@
     if (!$('#tela-dados').hidden) desenharSinc();
   }
 
-  function ligarSinc() {
-    sincronizar(true).then((deu) => {
-      if (deu) { estado.sinc.ativa = true; salvar(); avisar('Sincronização ligada'); }
-      mostrarSinc();
-    });
+  function tentarEntrar(criar) {
+    const email = $('#sinc-email').value.trim();
+    const senha = $('#sinc-senha').value;
+    if (!email || !senha) { sincMsg = 'Digite e-mail e senha.'; mostrarSinc(); return; }
+    sincMsg = criar ? 'Criando conta…' : 'Entrando…';
+    mostrarSinc();
+    entrar(email, senha, criar).then((s) => {
+      $('#sinc-senha').value = '';
+      if (!s) { sincMsg = 'Conta criada. Confirme o e-mail (ou desligue a confirmação no Supabase) e toque em Entrar.'; mostrarSinc(); return; }
+      estado.sinc.ativa = true;
+      salvar();
+      iniciarTimerPeriodico();
+      sincMsg = '';
+      return sincronizar().then(() => { avisar('Sincronização ligada'); });
+    }).catch((e) => { sincMsg = mensagemErroSinc(e); mostrarSinc(); });
   }
 
-  function desligarSinc() {
+  function sair() {
+    const c = sb;
     estado.sinc.ativa = false;
-    token = null;
     clearTimeout(temporizadorSinc);
+    clearInterval(timerPeriodico);
     salvar();
     sincMsg = '';
-    mostrarSinc();
-    avisar('Sincronização desligada. Os dados continuam aqui e no Drive.');
+    (c ? c.auth.signOut().catch(() => {}) : Promise.resolve()).then(() => { sessao = null; mostrarSinc(); });
+    avisar('Você saiu. Os dados continuam neste aparelho e na nuvem.');
   }
 
   /* ---------- ligações ---------- */
@@ -862,10 +880,11 @@
       $('#msg-faixas').textContent = 'Faixas padrão restauradas.';
     });
     $('#btn-apagar').addEventListener('click', apagarTudo);
-    $('#btn-sinc-ligar').addEventListener('click', ligarSinc);
-    $('#btn-sinc-agora').addEventListener('click', () => sincronizar(true));
-    $('#btn-sinc-desligar').addEventListener('click', desligarSinc);
-    $('#sinc-hoje').addEventListener('click', () => sincronizar(true));
+    $('#sinc-login').addEventListener('submit', (ev) => { ev.preventDefault(); tentarEntrar(false); });
+    $('#btn-sinc-criar').addEventListener('click', () => tentarEntrar(true));
+    $('#btn-sinc-agora').addEventListener('click', () => sincronizar());
+    $('#btn-sinc-sair').addEventListener('click', sair);
+    $('#sinc-hoje').addEventListener('click', () => { if (logado()) sincronizar(); else { mostrarTela('dados'); const el = $('#sinc-email'); if (el) el.focus(); } });
 
     // pede ao navegador para não apagar os dados sozinho quando faltar espaço
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
@@ -878,16 +897,20 @@
     window.addEventListener('pageshow', verificarVirada);
     window.addEventListener('focus', verificarVirada);
 
-    // ao voltar para o app, busca o que foi anotado no outro aparelho (no máximo uma vez por minuto)
+    // ao voltar para o app, busca o que foi anotado no outro aparelho
     let ultimaTentativa = 0;
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState !== 'visible' || !estado.sinc.ativa || Date.now() - ultimaTentativa < 60000) return;
+      if (document.visibilityState !== 'visible' || !estado.sinc.ativa || !cfgSup() || Date.now() - ultimaTentativa < 8000) return;
       ultimaTentativa = Date.now();
-      sincronizar(false);
+      if (logado()) sincronizar(); else sessaoAtual().then((ses) => { if (ses) sincronizar(); else mostrarSinc(); }).catch(() => {});
     });
 
     mostrarTela((location.hash || '#hoje').slice(1));
-    if (estado.sinc.ativa && clienteId()) { ultimaTentativa = Date.now(); sincronizar(false); }
+    if (estado.sinc.ativa && cfgSup()) {
+      iniciarTimerPeriodico();
+      ultimaTentativa = Date.now();
+      sessaoAtual().then((ses) => { mostrarSinc(); if (ses) sincronizar(); }).catch(() => {});
+    }
   }
 
   iniciar();

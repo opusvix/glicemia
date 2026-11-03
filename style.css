@@ -420,3 +420,9 @@ textarea { width: 100%; resize: vertical; margin: 8px 0; font-size: 14px; }
   .cartoes.dois { grid-template-columns: repeat(3, 1fr); max-width: 760px; }
   .painel-topo h1 { font-size: 26px; }
 }
+
+/* ---------- formulário de login da sincronização ---------- */
+
+#sinc-login { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+#sinc-login input { width: 100%; }
+#sinc-login .acoes-grade { margin-top: 2px; }

@@ -150,13 +150,22 @@
     <section class="bloco" aria-labelledby="h-sinc">
       <h2 id="h-sinc" class="sub-titulo">Sincronizar celular e computador</h2>
       <p class="dica" id="sinc-texto"></p>
+      <form id="sinc-login" hidden autocomplete="on">
+        <label for="sinc-email" class="so-leitor">E-mail da conta de sincronização</label>
+        <input type="email" id="sinc-email" inputmode="email" autocomplete="username" placeholder="E-mail">
+        <label for="sinc-senha" class="so-leitor">Senha</label>
+        <input type="password" id="sinc-senha" autocomplete="current-password" placeholder="Senha (mínimo 6 caracteres)">
+        <div class="acoes-grade">
+          <button type="submit" class="botao botao-primario" id="btn-sinc-entrar">Entrar</button>
+          <button type="button" class="botao botao-sec" id="btn-sinc-criar">Criar conta</button>
+        </div>
+      </form>
       <div class="acoes-grade">
-        <button type="button" class="botao botao-primario" id="btn-sinc-ligar" hidden>Ligar sincronização</button>
-        <button type="button" class="botao botao-sec" id="btn-sinc-agora" hidden>Sincronizar agora</button>
-        <button type="button" class="botao botao-texto" id="btn-sinc-desligar" hidden>Desligar</button>
+        <button type="button" class="botao botao-primario" id="btn-sinc-agora" hidden>Sincronizar agora</button>
+        <button type="button" class="botao botao-texto" id="btn-sinc-sair" hidden>Sair</button>
       </div>
       <p class="dica" id="sinc-status" role="status" aria-live="polite"></p>
-      <p class="dica">Ao ligar, o app pede ao Google acesso só à pasta privada dele no seu Drive. Veja a <a href="privacidade.html">Política de Privacidade</a>.</p>
+      <p class="dica" id="sinc-aviso-privacidade" hidden>Seus registros ficam numa conta privada no Supabase, que só você abre com seu login. Veja a <a href="privacidade.html">Política de Privacidade</a>.</p>
     </section>
 
     <section class="bloco" aria-labelledby="h-backup">
@@ -193,7 +202,7 @@
   </section>
 
   <footer class="rodape-legal">
-    <p>Glicemia em jejum: registro diário da glicemia em jejum, com relatório e gráfico. Os dados ficam só no seu aparelho; a sincronização com o Google Drive é opcional.</p>
+    <p>Glicemia em jejum: registro diário da glicemia em jejum, com relatório e gráfico. Os dados ficam no seu aparelho; a sincronização entre aparelhos (via Supabase) é opcional.</p>
     <p><a href="privacidade.html">Política de Privacidade</a> · <a href="termos.html">Termos de Serviço</a></p>
   </footer>
 
