@@ -20,6 +20,10 @@
   --st-critico: #d03b3b;
   --nota-fundo: #f1efe6;
   --altura-abas: 64px;
+  --r-1: 8px;
+  --r-2: 12px;
+  --r-3: 16px;
+  --sombra-cartao: 0 1px 2px rgba(28, 92, 171, 0.08), 0 8px 24px -10px rgba(28, 92, 171, 0.22);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -68,7 +72,7 @@ body {
   white-space: nowrap;
 }
 
-h1 { font-size: 26px; line-height: 1.15; margin: 0; letter-spacing: -0.01em; font-weight: 650; }
+h1 { font-size: 26px; line-height: 1.15; margin: 0; letter-spacing: -0.02em; font-weight: 650; }
 .sub-titulo { font-size: 17px; font-weight: 650; margin: 32px 0 8px; }
 .cab { margin-bottom: 20px; }
 .cab-data { margin: 0 0 4px; color: var(--tinta-2); font-size: 15px; }
@@ -88,13 +92,13 @@ h1 { font-size: 26px; line-height: 1.15; margin: 0; letter-spacing: -0.01em; fon
 }
 .linha-dia label { color: var(--tinta-2); font-size: 15px; }
 
-input[type="date"], select, input[type="text"], textarea {
+input[type="date"], input[type="time"], input[type="email"], input[type="password"], select, input[type="text"], textarea {
   font: inherit;
   color: var(--tinta);
   background: var(--superficie);
   border: 1px solid var(--eixo);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: var(--r-2);
+  padding: 10px 14px;
   min-height: 44px;
 }
 
@@ -134,7 +138,7 @@ input[type="date"], select, input[type="text"], textarea {
   font-weight: 600;
   min-height: 52px;
   padding: 0 20px;
-  border-radius: 10px;
+  border-radius: var(--r-2);
   border: 1px solid transparent;
   cursor: pointer;
 }
@@ -189,7 +193,7 @@ input[type="date"], select, input[type="text"], textarea {
 .kpi-rotulo { color: var(--tinta-2); font-size: 14px; }
 .kpi-nota { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-height: 36px; }
 .kpi-nota select { min-height: 34px; padding: 2px 6px; font-size: 14px; border-radius: 8px; }
-.kpi-valor { font-size: 40px; line-height: 1.1; font-weight: 650; font-variant-numeric: tabular-nums; }
+.kpi-valor { font-size: 40px; line-height: 1.1; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 .kpi-valor small { font-size: 14px; font-weight: 400; color: var(--tinta-2); margin-left: 6px; }
 .kpi-nota { color: var(--tinta-2); font-size: 13px; }
 
@@ -359,7 +363,7 @@ textarea { width: 100%; resize: vertical; margin: 8px 0; font-size: 14px; }
 .painel-paginas { display: flex; flex-wrap: wrap; gap: 8px; }
 .pag-btn { font-size: 14px; min-height: 42px; }
 
-.filtros { border: 1px solid var(--regua); border-radius: 10px; padding: 0 12px; }
+.filtros { border: 1px solid var(--regua); border-radius: var(--r-2); padding: 0 12px; }
 .filtros > summary { cursor: pointer; padding: 12px 0; font-weight: 600; font-size: 15px; }
 .filtro-grupo { border: 0; padding: 0; margin: 0 0 14px; }
 .filtro-grupo legend { color: var(--tinta-2); font-size: 13px; margin-bottom: 6px; padding: 0; }
@@ -373,9 +377,9 @@ textarea { width: 100%; resize: vertical; margin: 8px 0; font-size: 14px; }
 
 .cartoes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
 .cartoes.dois { grid-template-columns: 1fr 1fr; }
-.cartao { border: 1px solid var(--regua); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 4px; background: var(--superficie); }
+.cartao { border: 1px solid var(--regua); border-radius: var(--r-3); padding: 16px; box-shadow: var(--sombra-cartao); display: flex; flex-direction: column; gap: 4px; background: var(--superficie); }
 .cartao .rot { color: var(--tinta-2); font-size: 13px; }
-.cartao .val { font-size: 34px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.05; }
+.cartao .val { font-size: 34px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.05; letter-spacing: -0.02em; }
 .cartao .val small { font-size: 13px; font-weight: 400; color: var(--tinta-2); margin-left: 5px; }
 .cartao .nota { color: var(--tinta-2); font-size: 13px; }
 
@@ -423,6 +427,12 @@ textarea { width: 100%; resize: vertical; margin: 8px 0; font-size: 14px; }
 
 /* ---------- formulário de login da sincronização ---------- */
 
-#sinc-login { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
-#sinc-login input { width: 100%; }
-#sinc-login .acoes-grade { margin-top: 2px; }
+#sinc-login { display: flex; flex-direction: column; gap: 14px; margin: 14px 0; padding: 28px; background: var(--superficie); border: 1px solid var(--regua); border-radius: var(--r-3); box-shadow: var(--sombra-cartao); }
+#sinc-login input { width: 100%; min-height: 48px; }
+#sinc-login .acoes-grade { margin-top: 6px; }
+@media (max-width: 380px) { #sinc-login { padding: 20px; } }
+
+/* No tema escuro não há sombra: a separação vem da camada de superfície mais a linha de 1px */
+@media (prefers-color-scheme: dark) {
+  :root { --sombra-cartao: none; }
+}
