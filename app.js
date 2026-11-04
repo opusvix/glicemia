@@ -17,6 +17,8 @@
     notas: [],                // { data, texto, ts }  observações do dia (opcional, sincroniza)
     faixas: Object.assign({}, G.FAIXAS_PADRAO),
     faixasTs: 0,
+    tema: 'auto',          // 'auto' | 'claro' | 'escuro' (sincroniza)
+    temaTs: 0,
     janela: 7,
     periodo: 90,
     ultimoBackup: null,
@@ -34,6 +36,8 @@
       estado.notas = n.notas;
       estado.faixas = n.faixas;
       estado.faixasTs = n.faixasTs;
+      estado.tema = n.tema;
+      estado.temaTs = n.temaTs;
       if ([7, 14, 30].indexOf(o.janela) > -1) estado.janela = o.janela;
       if ([0, 30, 90].indexOf(o.periodo) > -1) estado.periodo = o.periodo;
       if (typeof o.ultimoBackup === 'string') estado.ultimoBackup = o.ultimoBackup;
@@ -452,6 +456,34 @@
     $('#fx-alta').value = estado.faixas.alta;
     $('#txt-ultimo-backup').textContent = estado.ultimoBackup ? 'Último backup: ' + G.dataBR(estado.ultimoBackup) + '.' : 'Nenhum backup feito ainda.';
     desenharSinc();
+    desenharTema();
+  }
+
+  /* ---------- tema (claro, escuro ou automático) ---------- */
+
+  const metasCor = () => Array.from(document.querySelectorAll('meta[name="theme-color"]'));
+  const midiaOriginal = metasCor().map((m) => m.getAttribute('media'));
+
+  function aplicarTema() {
+    const raiz = document.documentElement;
+    if (estado.tema === 'auto') raiz.removeAttribute('data-tema'); else raiz.setAttribute('data-tema', estado.tema);
+    // a barra do navegador acompanha: a meta que não vale recebe uma condição que nunca é verdadeira
+    metasCor().forEach((m, i) => {
+      if (estado.tema === 'auto') m.setAttribute('media', midiaOriginal[i]);
+      else m.setAttribute('media', (estado.tema === 'claro') === (i === 0) ? 'all' : 'not all');
+    });
+  }
+
+  function desenharTema() {
+    $$('.tema-op').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tema === estado.tema)));
+  }
+
+  function escolherTema(t) {
+    if (G.TEMAS.indexOf(t) < 0 || t === estado.tema) return;
+    const gravou = alterar(() => { estado.tema = t; estado.temaTs = Date.now(); });
+    if (!gravou) return;
+    aplicarTema();
+    desenharTema();
   }
 
   function lerDadosImportacao() {
@@ -570,6 +602,7 @@
         estado.notas = G.ordenar((b.notas || []).map((n) => ({ data: n.data, texto: n.texto, ts: agora })));
         estado.faixas = b.faixas;
         estado.faixasTs = agora;
+        if (b.temaTs) { estado.tema = b.tema; estado.temaTs = agora; }
       });
       if (gravou) { avisar('Backup restaurado: ' + b.registros.length + ' registros'); desenharDados(); }
     });
@@ -686,7 +719,7 @@
     });
   }
 
-  const vistaDoEstado = () => ({ registros: estado.registros, apagados: estado.apagados, notas: estado.notas, faixas: estado.faixas, faixasTs: estado.faixasTs });
+  const vistaDoEstado = () => ({ registros: estado.registros, apagados: estado.apagados, notas: estado.notas, faixas: estado.faixas, faixasTs: estado.faixasTs, tema: estado.tema, temaTs: estado.temaTs });
 
   function aplicarEstado(novo) {
     estado.registros = novo.registros;
@@ -694,6 +727,10 @@
     estado.notas = novo.notas;
     estado.faixas = novo.faixas;
     estado.faixasTs = novo.faixasTs;
+    estado.tema = novo.tema;
+    estado.temaTs = novo.temaTs;
+    aplicarTema();
+    desenharTema();
   }
 
   async function executarSinc() {
@@ -825,6 +862,7 @@
 
   function iniciar() {
     carregar();
+    aplicarTema();
 
     $$('.aba').forEach((b) => b.addEventListener('click', () => mostrarTela(b.dataset.tela)));
     $('#btn-ir-backup').addEventListener('click', () => mostrarTela('dados'));
@@ -872,6 +910,7 @@
       if (a) restaurarBackup(a);
       ev.target.value = '';
     });
+    $$('.tema-op').forEach((b) => b.addEventListener('click', () => escolherTema(b.dataset.tema)));
     $('#btn-salvar-faixas').addEventListener('click', salvarFaixas);
     $('#btn-faixas-padrao').addEventListener('click', () => {
       const gravou = alterar(() => { estado.faixas = Object.assign({}, G.FAIXAS_PADRAO); estado.faixasTs = Date.now(); });

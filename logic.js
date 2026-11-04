@@ -449,6 +449,10 @@
     return '\ufeff' + linhas.join('\r\n') + '\r\n';
   }
 
+  /* Tema de cores escolhido pela pessoa: 'auto' (segue o sistema), 'claro' ou 'escuro'. Sincroniza como as faixas. */
+  const TEMAS = ['auto', 'claro', 'escuro'];
+  const resolverTema = (t) => (TEMAS.indexOf(t) > -1 ? t : 'auto');
+
   function gerarBackup(estado, agora) {
     return JSON.stringify({
       app: 'glicemia-diaria',
@@ -456,6 +460,8 @@
       exportadoEm: (agora || new Date()).toISOString(),
       faixas: estado.faixas,
       faixasTs: estado.faixasTs || 0,
+      tema: resolverTema(estado.tema),
+      temaTs: estado.temaTs || 0,
       registros: estado.registros,
       apagados: estado.apagados || [],
       notas: estado.notas || [],
@@ -527,7 +533,12 @@
       else if (ehPadrao(fa) !== ehPadrao(fb)) usaB = ehPadrao(fa);   // empate: a faixa personalizada vence o padrão
       else usaB = JSON.stringify(fb) > JSON.stringify(fa);
     }
-    return { registros: ordenar(registros), apagados: ordenar(apagados), notas: ordenar(notas), faixas: usaB ? fb : fa, faixasTs: usaB ? tb : ta };
+    // tema: vence a escolha mais recente; no empate, o texto maior (regra fixa, os dois aparelhos chegam ao mesmo resultado)
+    const tha = resolverTema(a && a.tema), thb = resolverTema(b && b.tema);
+    const tsa = tsValido(a && a.temaTs), tsb = tsValido(b && b.temaTs);
+    const temaB = !!b && (tsb !== tsa ? tsb > tsa : thb > tha);
+    return { registros: ordenar(registros), apagados: ordenar(apagados), notas: ordenar(notas), faixas: usaB ? fb : fa, faixasTs: usaB ? tb : ta,
+      tema: temaB ? thb : tha, temaTs: temaB ? tsb : tsa };
   }
 
   /* Estado vindo do armazenamento ou de arquivo -> estado limpo e sem duplicidades. */
@@ -539,13 +550,15 @@
       notas: sanitizarNotas(o.notas),
       faixas: o.faixas,
       faixasTs: o.faixasTs,
+      tema: o.tema,
+      temaTs: o.temaTs,
     }, null);
   }
 
   /* Texto que identifica o conteúdo: duas assinaturas iguais = nada a sincronizar. */
   function assinatura(e) {
     const n = normalizarEstado(e);
-    return JSON.stringify([n.registros, n.apagados, n.notas, n.faixas, n.faixasTs]);
+    return JSON.stringify([n.registros, n.apagados, n.notas, n.faixas, n.faixasTs, n.tema, n.temaTs]);
   }
 
   /* Filtra o que vem do armazenamento ou de um backup: data válida (normalizada) e valor dentro do limite. */
@@ -611,7 +624,7 @@
     lerTabela, detectarColunas, detectarOrdemData, extrairRegistros, ordenar, mesclar,
     media, serieMediaMovel, filtrarUltimosDias, classificar, validarFaixas,
     gerarCSV, gerarBackup, lerBackup, sanitizarRegistros, sanitizarApagados, resolverFaixas, detectarDelimitador,
-    fundir, normalizarEstado, assinatura,
+    TEMAS, resolverTema, fundir, normalizarEstado, assinatura,
     parseHora, horaDecimal, sanitizarObs, sanitizarNotas,
     diaSemanaNum, anosDisponiveis, filtrarPainel, resumoPainel, porMes, porDiaSemana, fdsVsUtil, pontosHora, correlacao, forcaCorrelacao,
   };

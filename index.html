@@ -13,6 +13,10 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
+<script>
+/* Aplica o tema escolhido antes da primeira pintura, para a tela não piscar. */
+(function () { try { var o = JSON.parse(localStorage.getItem('glicemia-diaria:v1')); if (o && (o.tema === 'claro' || o.tema === 'escuro')) document.documentElement.setAttribute('data-tema', o.tema); } catch (e) {} })();
+</script>
 <link rel="stylesheet" href="style.css">
 <title>Glicemia</title>
 </head>
@@ -178,6 +182,16 @@
       </div>
       <input type="file" id="arq-backup" accept=".json,application/json" hidden>
       <p class="dica" id="txt-ultimo-backup"></p>
+    </section>
+
+    <section class="bloco" aria-labelledby="h-tema">
+      <h2 id="h-tema" class="sub-titulo">Aparência</h2>
+      <p class="dica">Automático segue o tema do aparelho. A escolha vale para todos os aparelhos com a sincronização ligada.</p>
+      <div class="chips" role="group" aria-label="Tema de cores">
+        <button type="button" class="tema-op" data-tema="auto" aria-pressed="true">Automático</button>
+        <button type="button" class="tema-op" data-tema="claro" aria-pressed="false">Claro</button>
+        <button type="button" class="tema-op" data-tema="escuro" aria-pressed="false">Escuro</button>
+      </div>
     </section>
 
     <section class="bloco" aria-labelledby="h-faixas">
