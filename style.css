@@ -428,6 +428,10 @@ textarea { width: 100%; resize: vertical; margin: 8px 0; font-size: 14px; }
 .grafico .b-atencao { fill: var(--st-aviso); }
 .grafico .b-alta { fill: var(--st-critico); }
 .grafico .g-ponto.grande { r: 6; }
+.grafico .g-area-dia { fill: var(--serie-1); opacity: 0.13; stroke: none; }
+.grafico .g-area-mm { fill: var(--serie-2); opacity: 0.20; stroke: none; }
+.grafico .rotulo-dia { fill: var(--serie-1); font-weight: 650; font-size: 10px; }
+.grafico .rotulo-mm { fill: var(--serie-2); font-weight: 650; font-size: 10px; }
 .grafico .g-nota { fill: var(--tinta-2); }
 .grafico .mk-normal { fill: var(--st-bom); }
 .grafico .mk-atencao { fill: var(--st-aviso); }

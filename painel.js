@@ -194,6 +194,21 @@
     return partes.filter((a) => a.length > 1).map((a) => 'M' + a.join(' L')).join(' ');
   }
 
+  /* Área preenchida sob a linha, respeitando os mesmos buracos de 4+ dias. */
+  function areas(serie, X, Y, campo, baseY) {
+    const partes = [];
+    let atual = [];
+    serie.forEach((p, i) => {
+      if (i && G.diaNum(p.data) - G.diaNum(serie[i - 1].data) > 4) { partes.push(atual); atual = []; }
+      atual.push([X(p.data), Y(p[campo])]);
+    });
+    partes.push(atual);
+    return partes.filter((a) => a.length > 1).map((a) => {
+      const linha = a.map((pt, i) => (i ? 'L' : 'M') + pt[0].toFixed(1) + ' ' + pt[1].toFixed(1)).join(' ');
+      return linha + ' L' + a[a.length - 1][0].toFixed(1) + ' ' + baseY.toFixed(1) + ' L' + a[0][0].toFixed(1) + ' ' + baseY.toFixed(1) + ' Z';
+    }).join(' ');
+  }
+
   function dicaFlutuante(alvo, svgEl, W, itens, aoMostrar) {
     const dica = alvo.querySelector('.dica-flutuante');
     const cruz = svgEl.querySelector('.g-cruz');
@@ -232,11 +247,26 @@
       const iso = new Date(Math.round(t0 + (span * i) / 4) * 86400000).toISOString().slice(0, 10);
       ticks += '<text x="' + X(iso).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="' + (i === 0 ? 'start' : i === 4 ? 'end' : 'middle') + '">' + (meses ? G.mesAno(iso) : G.dataCurta(iso)) + '</text>';
     }
+    const baseY = Y(ey.lo);
     let svg = bandas(m, W, Y, ey, fx) + grade(m, W, H, ey, Y, ticks);
+    // área sob cada linha (dourado da média móvel embaixo, azul do dia por cima), como na referência
+    svg += '<path class="g-area-mm" d="' + areas(serie, X, Y, 'media', baseY) + '"/>';
+    svg += '<path class="g-area-dia" d="' + areas(serie, X, Y, 'valor', baseY) + '"/>';
     svg += '<path class="g-linha-dia" d="' + caminhos(serie, X, Y, 'valor') + '"/><path class="g-linha-mm" d="' + caminhos(serie, X, Y, 'media') + '"/>';
     const raio = serie.length > 200 ? 1.8 : serie.length > 90 ? 2.5 : 3.5;
     serie.forEach((p) => { svg += '<circle class="g-ponto" cx="' + X(p.data).toFixed(1) + '" cy="' + Y(p.valor).toFixed(1) + '" r="' + raio + '"/>'; });
     notas.forEach((n) => { const x = X(n.data), y = H - m.b; svg += '<path class="g-nota" d="M' + (x - 4.5).toFixed(1) + ' ' + y + ' L' + (x + 4.5).toFixed(1) + ' ' + y + ' L' + x.toFixed(1) + ' ' + (y - 8) + ' Z"/>'; });
+    // rótulos de valor sobre os pontos: conforme a largura. No PC cabe um mês; no celular, poucos dias.
+    // o rótulo do dia aparece mais cedo; o da média móvel só em períodos bem curtos, para não poluir.
+    const larguraPlot = W - m.l - m.r;
+    const maxDia = Math.floor(larguraPlot / 30);
+    const maxMM = Math.floor(larguraPlot / 70);
+    if (serie.length <= maxDia) {
+      serie.forEach((p) => {
+        svg += '<text class="rotulo-dia" x="' + X(p.data).toFixed(1) + '" y="' + (Y(p.valor) - 8).toFixed(1) + '" text-anchor="middle">' + val(p.valor) + '</text>';
+        if (serie.length <= maxMM && Math.abs(Y(p.valor) - Y(p.media)) > 13) svg += '<text class="rotulo-mm" x="' + X(p.data).toFixed(1) + '" y="' + (Y(p.media) + 15).toFixed(1) + '" text-anchor="middle">' + num(p.media, 0) + '</text>';
+      });
+    }
     svg += '<line class="g-cruz" hidden y1="' + m.t + '" y2="' + (H - m.b) + '"/>';
     alvo.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Gráfico do jejum diário e da média móvel de 7 dias, com as faixas Normal, Atenção e Alta. A página Detalhamento Diário traz os mesmos valores em tabela.">' + svg + '</svg><div class="dica-flutuante" hidden></div>';
     const porData = {};
