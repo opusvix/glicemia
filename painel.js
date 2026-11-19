@@ -321,14 +321,22 @@
       ticks += '<text x="' + X(h).toFixed(1) + '" y="' + (H - 16) + '" text-anchor="middle">' + h + 'h</text>';
     }
     ticks += '<text x="' + ((m.l + W - m.r) / 2) + '" y="' + (H - 3) + '" text-anchor="middle">Hora da coleta</text>';
+    // dias que caem exatamente no mesmo lugar (mesmo horário e valor) são afastados na horizontal,
+    // mantendo o valor (vertical) intacto, para cada um ficar visível e tocável separadamente.
+    const grupos = {};
+    pts.forEach((p) => { (grupos[p.x + '|' + p.y] = grupos[p.x + '|' + p.y] || []).push(p); });
+    const marcados = [];
+    Object.keys(grupos).forEach((k) => {
+      const g = grupos[k];
+      g.forEach((p, i) => { marcados.push({ sx: X(p.x) + (g.length > 1 ? (i - (g.length - 1) / 2) * 8 : 0), sy: Y(p.y), p: p }); });
+    });
     let svg = bandas(m, W, Y, ey, fx) + grade(m, W, H, ey, Y, ticks);
-    pts.forEach((p) => { svg += marcador(G.classificar(p.y, fx), X(p.x), Y(p.y)); });
+    marcados.forEach((pt) => { svg += marcador(G.classificar(pt.p.y, fx), pt.sx, pt.sy); });
     alvo.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Dispersão da hora da coleta contra o valor do jejum, ' + pts.length + ' dias.">' + svg + '</svg><div class="dica-flutuante" hidden></div>';
-    // dispersão: o ponto mais próximo é por distância em X e Y (vários dias podem ter o mesmo horário);
-    // dias que caem no mesmo lugar (mesmo horário e valor) são todos listados, mais recente primeiro.
+    // o ponto mais próximo é por distância em X e Y (vários dias podem ter o mesmo horário).
+    // se ainda houver dias no mesmo lugar, são listados juntos, mais recente primeiro.
     const svgEl = alvo.querySelector('svg');
     const dica = alvo.querySelector('.dica-flutuante');
-    const marcados = pts.map((p) => ({ sx: X(p.x), sy: Y(p.y), p: p }));
     const fmtHora = (h) => String(Math.floor(h)).padStart(2, '0') + ':' + String(Math.round((h % 1) * 60)).padStart(2, '0');
     function mostrar(ev) {
       const r = svgEl.getBoundingClientRect();
