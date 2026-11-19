@@ -324,14 +324,41 @@
     let svg = bandas(m, W, Y, ey, fx) + grade(m, W, H, ey, Y, ticks);
     pts.forEach((p) => { svg += marcador(G.classificar(p.y, fx), X(p.x), Y(p.y)); });
     alvo.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Dispersão da hora da coleta contra o valor do jejum, ' + pts.length + ' dias.">' + svg + '</svg><div class="dica-flutuante" hidden></div>';
-    dicaFlutuante(alvo, alvo.querySelector('svg'), W, pts.map((p) => ({ x: X(p.x), p: p })), (it) =>
-      '<strong>' + G.dataBR(it.p.data) + '</strong>Hora: ' + String(Math.floor(it.p.x)).padStart(2, '0') + ':' + String(Math.round((it.p.x % 1) * 60)).padStart(2, '0') + '<br>Jejum: ' + val(it.p.y) + ' mg/dL<br>' + chipFaixa(it.p.y, fx));
+    // dispersão: o ponto mais próximo é por distância em X e Y (vários dias podem ter o mesmo horário);
+    // dias que caem no mesmo lugar (mesmo horário e valor) são todos listados, mais recente primeiro.
+    const svgEl = alvo.querySelector('svg');
+    const dica = alvo.querySelector('.dica-flutuante');
+    const marcados = pts.map((p) => ({ sx: X(p.x), sy: Y(p.y), p: p }));
+    const fmtHora = (h) => String(Math.floor(h)).padStart(2, '0') + ':' + String(Math.round((h % 1) * 60)).padStart(2, '0');
+    function mostrar(ev) {
+      const r = svgEl.getBoundingClientRect();
+      const px = ((ev.clientX - r.left) / r.width) * W;
+      const py = ((ev.clientY - r.top) / r.height) * H;
+      let melhor = null, dist = Infinity;
+      marcados.forEach((pt) => { const d = (pt.sx - px) * (pt.sx - px) + (pt.sy - py) * (pt.sy - py); if (d < dist) { dist = d; melhor = pt; } });
+      if (!melhor) return;
+      const juntos = marcados.filter((pt) => Math.abs(pt.sx - melhor.sx) < 6 && Math.abs(pt.sy - melhor.sy) < 6)
+        .sort((a, b) => (a.p.data < b.p.data ? 1 : a.p.data > b.p.data ? -1 : 0));
+      if (juntos.length > 1) {
+        dica.innerHTML = '<strong>' + juntos.length + ' dias neste ponto</strong>' +
+          juntos.map((pt) => G.diaSemana(pt.p.data) + ' ' + G.dataBR(pt.p.data) + ' · ' + fmtHora(pt.p.x) + ' · ' + val(pt.p.y) + ' mg/dL').join('<br>');
+      } else {
+        dica.innerHTML = '<strong>' + G.diaSemana(melhor.p.data) + ' ' + G.dataBR(melhor.p.data) + '</strong>Hora: ' + fmtHora(melhor.p.x) + '<br>Jejum: ' + val(melhor.p.y) + ' mg/dL<br>' + chipFaixa(melhor.p.y, fx);
+      }
+      dica.hidden = false;
+      const larg = alvo.clientWidth, w = dica.offsetWidth;
+      dica.style.left = Math.max(0, Math.min(larg - w, (melhor.sx / W) * larg - w / 2)) + 'px';
+    }
+    svgEl.addEventListener('pointermove', mostrar);
+    svgEl.addEventListener('pointerdown', mostrar);
+    svgEl.addEventListener('pointerleave', (ev) => { if (ev.pointerType === 'mouse') dica.hidden = true; });
   }
 
   /* ---------- montagem ---------- */
 
   function desenhar(el, dados) {
     ultimo = { el: el, dados: dados };
+    const rolagem = window.scrollY;   // preserva a posição ao reconstruir (sincronização, filtros)
     const fx = dados.faixas;
     const regs = G.filtrarPainel(dados.registros, estado.filtros);
     const notas = G.filtrarPainel(dados.notas.filter((n) => n.texto), estado.filtros);
@@ -361,6 +388,7 @@
     if (mais) mais.addEventListener('click', () => { estado.linhas += 60; desenhar(el, dados); });
     const det = el.querySelector('details.filtros');
     if (det) det.addEventListener('toggle', () => { estado.filtrosAbertos = det.open; });
+    if (rolagem) window.scrollTo(0, rolagem);
   }
 
   let esperaRedesenho = null;

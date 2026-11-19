@@ -747,15 +747,20 @@
     }
     // a pessoa pode ter mexido durante a conversa com o servidor: funde de novo com o que está na tela agora
     const novo = G.fundir(vistaDoEstado(), fundido, Date.now());
+    let mudou = false;
     if (G.assinatura(novo) !== G.assinatura(vistaDoEstado())) {
       aplicarEstado(novo);
       sincPendente = G.assinatura(novo) !== G.assinatura(fundido) || sincPendente;
+      mudou = true;
     }
     estado.sinc.ultima = new Date().toISOString();
     salvar();
-    if (!$('#tela-hoje').hidden) desenharHoje(true);
-    else if (!$('#tela-relatorio').hidden) desenharRelatorio();
-    else if (!$('#tela-painel').hidden) desenharPainel();
+    // só redesenha quando os dados mudaram, senão a sincronização periódica reconstruiria a tela à toa (e jogava a rolagem para o topo)
+    if (mudou) {
+      if (!$('#tela-hoje').hidden) desenharHoje(true);
+      else if (!$('#tela-relatorio').hidden) desenharRelatorio();
+      else if (!$('#tela-painel').hidden) desenharPainel();
+    }
   }
 
   function mensagemErroSinc(e) {
